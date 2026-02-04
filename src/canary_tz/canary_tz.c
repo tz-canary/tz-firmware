@@ -5,8 +5,10 @@
 #include "psa/crypto.h"
 #include "psa_manifest/tfm_canary_tz.h"
 #include "common_defs.h"
+#include <arm_cmse.h>
 
-uint32_t canary = 0xdeadbeef;
+
+uint32_t canary_value = 0xdeadbeef;
 uint8_t initialized = 0;
 
 static void init_canary(void) {
@@ -16,14 +18,14 @@ static void init_canary(void) {
 
     psa_status_t status;
     
-    status = psa_generate_random((uint8_t *)&canary, sizeof(canary));
+    status = psa_generate_random((uint8_t *)&canary_value, sizeof(canary_value));
 
-    psa_status_t st = psa_generate_random((uint8_t *)&canary, sizeof(canary));
+    psa_status_t st = psa_generate_random((uint8_t *)&canary_value, sizeof(canary_value));
     if (st != PSA_SUCCESS) {
         return st;
     }
 
-    *((char *)&canary + 3) = '\0';
+    *((char *)&canary_value + 3) = '\0';
     initialized = 1;
 
     return PSA_SUCCESS;
@@ -33,28 +35,29 @@ static void init_canary(void) {
  * 핸들러: MSG_TYPE_GET_CANARY (Prologue)
  * ------------------------------------------------------------------------- */
 static psa_status_t handle_get_canary(psa_msg_t *msg) {
-    if (msg->out_size[0] < sizeof(canary)) {
-        return PSA_ERROR_BUFFER_TOO_SMALL;
-    }
-    
-    psa_write(msg->handle, 0, &canary, sizeof(canary));
-    return PSA_SUCCESS;
+    // psa_write(msg->handle, 0, &canary, sizeof(canary));
+    return canary_value;
 }
 
 static psa_status_t handle_check_canary(psa_msg_t *msg) {
     uint32_t received_canary = 0;
 
-    if (msg->in_size[0] != sizeof(uint32_t)) {
-        return PSA_ERROR_INVALID_ARGUMENT;
-    }
-
     psa_read(msg->handle, 0, &received_canary, sizeof(received_canary));
 
-    if (received_canary != canary) {
+    if (received_canary != canary_value) {
         return PSA_ERROR_DATA_INVALID;
     }
 
     return PSA_SUCCESS;
+}
+
+uint32_t __attribute__((cmse_nonsecure_entry)) __stack_protector_spe(void) {
+    return canary_value;
+}
+
+uint32_t __attribute__((cmse_nonsecure_entry)) __stack_protector_spe_check(uint32_t canary)
+{
+    return (canary == canary_value) ? 0 : -1;
 }
 
 /* -------------------------------------------------------------------------

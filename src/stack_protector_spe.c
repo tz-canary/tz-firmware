@@ -10,13 +10,15 @@
 #define TZ_CANARY_DEBUG
 
 #ifdef TZ_CANARY_DEBUG
-#include <zephyr/sys/printk.h>
 unsigned int called = 0;
 unsigned int called_check = 0;
 #endif
 
 extern void __stack_chk_fail_weak(void);
 
+// ipc model 테스트용
+
+#ifdef TZ_CANARY_IPC
 __attribute__((noinline, no_stack_protector))
 uint32_t __stack_protector_spe(void)
 {
@@ -77,3 +79,4 @@ void __stack_protector_spe_check(uint32_t canary)
         __stack_chk_fail_weak();
     }
 }
+#endif
