@@ -51,13 +51,26 @@ static psa_status_t handle_check_canary(psa_msg_t *msg) {
     return PSA_SUCCESS;
 }
 
-uint32_t __attribute__((cmse_nonsecure_entry)) __stack_protector_spe(void) {
-    return canary_value;
+uint32_t __attribute__((cmse_nonsecure_entry, naked)) __stack_protector_spe(void) {
+    asm volatile(
+        "   ldr    r0, =canary_value                         \n"
+        "   ldr    r0, [r0]                                 \n"
+        "   bxns   lr                                         \n"
+    );
 }
 
-uint32_t __attribute__((cmse_nonsecure_entry)) __stack_protector_spe_check(uint32_t canary)
+void __attribute__((cmse_nonsecure_entry, naked)) __stack_protector_spe_check(uint32_t canary)
 {
-    return (canary == canary_value) ? 0 : -1;
+    asm volatile(
+        "   ldr    r1, =canary_value                         \n"
+        "   ldr    r1, [r1]                                 \n"
+        "   cmp    r0, r1                                   \n"
+        "   bne    stack_protector_fail                      \n"
+        "   bxns   lr                                       \n"
+
+        "stack_protector_fail:                              \n"
+        "   bl     psa_panic                                \n"
+    );
 }
 
 /* -------------------------------------------------------------------------
